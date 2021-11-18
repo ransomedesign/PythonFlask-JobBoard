@@ -29,12 +29,26 @@ def execute_sql(sql, values=(), commit=False, single=False):
     cursor.close()
     return results
 
+# Routes
 
-@app.teardown_appcontext
-def close_connection(exception):
-    connection = getattr(g, '_connection', None)
-    if connection is not None:
-        connection.close()
+
+@app.route('/employer/<employer_id>')
+def employer(employer_id):
+    employer = execute_sql(
+        'SELECT * FROM employer WHERE id=?',
+        [employer_id],
+        single=True)
+    # Get all jobs for this employer.
+    jobs = execute_sql(
+        'SELECT job.id, job.title, job.description, job.salary FROM job JOIN employer ON employer.id = job.employer_id WHERE employer.id = ?',
+        [employer_id]
+    )
+    # Get all reviews for this employer.
+    reviews = execute_sql(
+        'SELECT review, rating, title, date, status FROM review JOIN employer ON employer.id = review.employer_id WHERE employer.id = ?',
+        [employer_id]
+    )
+    return render_template('employer.html', employer=employer, jobs=jobs, reviews=reviews)
 
 
 @app.route('/job/<job_id>')
@@ -46,12 +60,16 @@ def job(job_id):
     return render_template('job.html', job=job)
 
 
-# Route for showing jobs.
-
-
 @app.route('/')
 @app.route('/jobs')
 def jobs():
     jobs = execute_sql(
         'SELECT job.id, job.title, job.description, job.salary, employer.id as employer_id, employer.name as employer_name FROM job JOIN employer ON employer.id = job.employer_id')
     return render_template('index.html', jobs=jobs)
+
+
+@app.teardown_appcontext
+def close_connection(exception):
+    connection = getattr(g, '_connection', None)
+    if connection is not None:
+        connection.close()
